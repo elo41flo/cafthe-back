@@ -1,29 +1,35 @@
 const express = require("express");
-const { register, login, logout } = require("../controllers/ClientController");
+const { register, login, logout, getMe } = require("../controllers/ClientController");
 const router = express.Router();
-const cookieParser = require("cookie-parser");
-const cors = require("cors"); // AGATHE
+// AGATHE 
+const { verifyToken } = require("../middlewares/authMiddleware"); 
 
-// AGATHE
-// Vérification de session du client
-// Route protégée
-// GET /api/clients/me
-route.get("/me", verifyToken, getMe)
-
-// Deconnexion
-// Route protégée
-// POST /api/clients/logout
-router.post("/logout", logout)
-
-// Configuration CORS corrigée (Frontend URL et méthodes)
-const corsOptions = {
-    origin: process.env.FRONTEND_URL || "http://localhost:5173", // Correction ortho FRONTEND
-    methods: ["GET", "POST", "PUT", "DELETE"], // Correction tableau de strings
-    credentials: true // AGATHE
-};
-
-// Routes
+/**
+ * @route   POST /api/clients/register
+ */
 router.post("/register", register);
+
+/**
+ * @route   POST /api/clients/login
+ */
 router.post("/login", login);
+
+/**
+ * @route   GET /api/clients/me
+ * @desc    Vérification de session (Route protégée)
+ */
+// AGATHE : 
+// AGATHE : 
+router.get("/me", verifyToken, getMe);
+
+/**
+ * @route   POST /api/clients/logout
+ * @desc    Déconnexion (Route protégée)
+ */
+// AGATHE : 
+router.post("/logout", verifyToken, logout);
+
+// AGATHE : 
+// AGATHE : 
 
 module.exports = router;

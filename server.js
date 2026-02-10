@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
 const path = require('path');
+const cookieParser = require('cookie-parser'); // AGATHE
 require('dotenv').config();
 
 // Import de la connexion BDD
@@ -14,14 +15,15 @@ const clientRoutes = require("./client/routes/ClientRouter");
 const app = express();
 
 // --- MIDDLEWARES DE BASE ---
-app.use(express.json()); // Pour lire le body des requêtes POST (JSON)
-app.use(morgan("dev"));  // Pour voir les logs des requêtes dans le terminal
+app.use(express.json()); 
+app.use(cookieParser()); // AGATHE
+app.use(morgan("dev"));  
 
 // --- CONFIGURATION DU CORS ---
 app.use(cors({
     origin: process.env.FRONTEND_URL || "http://localhost:5173",
     methods: ["GET", "POST", "PUT", "DELETE"],
-    credentials: true
+    credentials: true // AGATHE
 }));
 
 // --- SERVIR LES IMAGES ---
@@ -32,27 +34,22 @@ app.get("/health", (req, res) => {
     res.json({ status: "OK", message: "L'API Cafthé est opérationnelle" });
 });
 
-// Utilisation des routeurs 
-// Rappel : Pour l'inscription, l'URL sera http://localhost:3000/api/clients/register
 app.use("/api/produits", produitRoutes);
 app.use("/api/clients", clientRoutes); 
 
 // --- GESTION DES ERREURS ---
 
-// 1. Erreur 404 : Si aucune route ne correspond
 app.use((req, res, next) => {
     res.status(404).json({
         error: "Route non trouvée",
-        path: req.originalUrl,
-        help: "Vérifiez que vous utilisez bien /api/clients/register (avec un s)"
+        path: req.originalUrl
     });
 });
 
-// 2. Erreur 500 : Erreur globale du serveur
 app.use((err, req, res, next) => {
     console.error("Erreur serveur :", err.stack);
     res.status(500).json({
-        message: "Une erreur interne est survenue sur le serveur.",
+        message: "Une erreur interne est survenue.",
         error: process.env.NODE_ENV === 'development' ? err.message : {}
     });
 });
@@ -65,6 +62,5 @@ app.listen(PORT, HOST, () => {
     console.log(`-------------------------------------------`);
     console.log(`✅ Serveur démarré sur http://${HOST}:${PORT}`);
     console.log(`🚀 Mode: ${process.env.NODE_ENV || 'développement'}`);
-    console.log(`📌 Test Inscription: http://${HOST}:${PORT}/api/clients/register`);
     console.log(`-------------------------------------------`);
 });

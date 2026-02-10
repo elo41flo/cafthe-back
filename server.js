@@ -20,8 +20,22 @@ app.use(cookieParser()); // AGATHE
 app.use(morgan("dev"));  
 
 // --- CONFIGURATION DU CORS ---
+// AGATHE
+const allowedOrigins = [
+    process.env.FRONTEND_URL, 
+    "http://localhost:5173", 
+    "http://localhost:5174"
+];
+
 app.use(cors({
-    origin: process.env.FRONTEND_URL || "http://localhost:5173",
+    origin: function (origin, callback) {
+        // AGATHE 
+        if (!origin || allowedOrigins.includes(origin)) {
+            callback(null, true);
+        } else {
+            callback(new Error('CORS non autorisé pour cette origine'));
+        }
+    },
     methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true // AGATHE
 }));

@@ -18,7 +18,6 @@ app.use(express.json()); // Pour lire le body des requêtes POST (JSON)
 app.use(morgan("dev"));  // Pour voir les logs des requêtes dans le terminal
 
 // --- CONFIGURATION DU CORS ---
-// Permet au Front-end (port 5173) de parler au Back-end (port 3000)
 app.use(cors({
     origin: process.env.FRONTEND_URL || "http://localhost:5173",
     methods: ["GET", "POST", "PUT", "DELETE"],
@@ -26,7 +25,6 @@ app.use(cors({
 }));
 
 // --- SERVIR LES IMAGES ---
-// Rend le dossier public/images accessible via http://localhost:3000/images
 app.use('/images', express.static(path.join(__dirname, 'public/images')));
 
 // --- DÉCLARATION DES ROUTES API ---
@@ -34,9 +32,10 @@ app.get("/health", (req, res) => {
     res.json({ status: "OK", message: "L'API Cafthé est opérationnelle" });
 });
 
-// Utilisation des routeurs (Correction : ajout du 's' à clients)
+// Utilisation des routeurs 
+// Rappel : Pour l'inscription, l'URL sera http://localhost:3000/api/clients/register
 app.use("/api/produits", produitRoutes);
-app.use("/api/clients", clientRoutes);
+app.use("/api/clients", clientRoutes); 
 
 // --- GESTION DES ERREURS ---
 
@@ -44,11 +43,12 @@ app.use("/api/clients", clientRoutes);
 app.use((req, res, next) => {
     res.status(404).json({
         error: "Route non trouvée",
-        path: req.originalUrl
+        path: req.originalUrl,
+        help: "Vérifiez que vous utilisez bien /api/clients/register (avec un s)"
     });
 });
 
-// 2. Erreur 500 : Erreur globale du serveur (évite que l'app crash sans message)
+// 2. Erreur 500 : Erreur globale du serveur
 app.use((err, req, res, next) => {
     console.error("Erreur serveur :", err.stack);
     res.status(500).json({
@@ -65,5 +65,6 @@ app.listen(PORT, HOST, () => {
     console.log(`-------------------------------------------`);
     console.log(`✅ Serveur démarré sur http://${HOST}:${PORT}`);
     console.log(`🚀 Mode: ${process.env.NODE_ENV || 'développement'}`);
+    console.log(`📌 Test Inscription: http://${HOST}:${PORT}/api/clients/register`);
     console.log(`-------------------------------------------`);
 });

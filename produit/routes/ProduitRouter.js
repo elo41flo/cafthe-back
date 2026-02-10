@@ -1,21 +1,38 @@
 // Router Articles
-// chemin : /api/produit
+// Chemin de base : /api/produits
 
 const express = require("express");
-const path = require("path");
-const { getAll, getById, getByCategory } = require("../controller/ProduitController");
-// const { verifyToken } = require(path.join(process.cwd(), 'middleware', 'authMiddleware'));
-// Temporairement, pour tester
-const verifyToken = (req, res, next) => { next(); };
+// Ajout des nouvelles fonctions importées du contrôleur
+const { 
+    getAll, 
+    getById, 
+    getByCategory, 
+    getFeatured, 
+    getNew 
+} = require("../controller/ProduitController");
+
+// Initialisation du routeur
 const router = express.Router();
 
-// GET /api/produit - Récupérer tous les produits
+// Middleware de test
+const verifyToken = (req, res, next) => { next(); };
+
+/**
+ * @route   GET /api/produits/categorie/:categorie
+ * @desc    Récupérer les produits filtrés par la colonne 'categorie'
+ */
+router.get("/categorie/:categorie", getByCategory);
+
+/**
+ * @route   GET /api/produits
+ * @desc    Récupérer tous les produits de la table 'Produits'
+ */
 router.get("/", getAll);
 
-// GET /api/produit/:id - Récuupérer un article par son ID
+/**
+ * @route   GET /api/produits/:id
+ * @desc    Récupérer un produit par son 'numero_produit'
+ */
 router.get("/:id", getById);
-
-// GET /api/produit/:categorie - Récupérer les articles d'une catégorie
-router.get("/categorie/:categorie", getByCategory);
 
 module.exports = router;

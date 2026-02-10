@@ -1,67 +1,109 @@
 // Controleur Produit
-const { getAllProduit, getProduitById, getProduitByCategory } = require("../models/ProduitModel");
+const { 
+    getAllProduit, 
+    getProduitById, 
+    getProduitByCategory,
+    getProduitsPhares,
+    getProduitsNouveaux 
+} = require("../models/ProduitModel");
 
+// Helper pour calculer le prix avec remise (évite de répéter le code)
+const calculerPrixPromotion = (p) => {
+    const remise = parseFloat(p.taux_remise) || 0;
+    const prixFinal = p.prix_ttc * (1 - remise / 100);
+    return {
+        ...p,
+        prix_final_ttc: parseFloat(prixFinal.toFixed(2)),
+        est_en_promotion: remise > 0
+    };
+};
+
+// Récupérer tous les produits
 const getAll = async (req, res) => {
     try {
-        const produit = await getAllProduit(); 
-        
+        const rows = await getAllProduit(); 
+        const produits = rows.map(calculerPrixPromotion);
+
         res.json({
             message: "Produits récupérés avec succès",
-            count: produit.length,
-            produit,
+            count: produits.length,
+            produits,
         });
     } catch (error) {
-        console.error("Erreur de récupération des produits", error.message);
-        res.status(500).json({
-            message: "Erreur de récupération des produits",
-        });
+        console.error("Erreur getAll :", error.message);
+        res.status(500).json({ message: "Erreur lors de la récupération des produits" });
     }
 };
 
 // Récupérer un produit par son id
-const getById = async (req,res) => {
+const getById = async (req, res) => {
     try {
         const { id } = req.params;
-        const produitId = parseInt(id);
+        const numeroProduit = parseInt(id);
 
-        const produit = await getProduitById(produitId);
-
-        if ( produit.lenght === 0) {
-            return res.status(404).json({
-                message: "Article non trouvé"
-            });
+        if (isNaN(numeroProduit)) {
+            return res.status(400).json({ message: "L'identifiant doit être un nombre valide" });
         }
 
-        res.json({
-            message: "Article récupéré avec succès",
-            produit: produit[0]
-        })
+        const data = await getProduitById(numeroProduit);
+
+        if (!data) {
+            return res.status(404).json({ message: "Ce produit n'existe pas" });
+        }
+
+        const produit = calculerPrixPromotion(data);
+
+        res.json({ message: "Produit trouvé", produit });
     } catch (error) {
-        console.error("Erreur de récupération des produit", error.message);
-        res.status(500).json({
-            message: "Erreur de récupération des produits",
-        });
+        console.error("Erreur getById :", error.message);
+        res.status(500).json({ message: "Erreur lors de la recherche du produit" });
     }
 };
 
-// Récupérer les produit par catégorie
+// Récupérer par catégorie
 const getByCategory = async (req, res) => {
     try {
-        const {categorie} = req.params;
-        const produit = await getProduitByCategory(categorie);
+        const { categorie } = req.params;
+        const rows = await getProduitByCategory(categorie);
+        const produits = rows.map(calculerPrixPromotion);
 
         res.json({
-            message: `Produits de la catégorie ${categorie}`,
-            count: produit.lentgth,
-            produit
-        })
-
-    } catch (error) {
-        console.error("Erreur de récupération par catégorie", error.message);
-        res.status(500).json({
-            message: "Erreur de récupérération des produits",
+            message: `Catégorie : ${categorie}`,
+            count: produits.length,
+            produits
         });
+    } catch (error) {
+        console.error("Erreur getByCategory :", error.message);
+        res.status(500).json({ message: "Erreur lors du filtrage" });
     }
 };
 
-module.exports = { getAll, getById, getByCategory };
+// Produits Phares (Accueil)
+const getFeatured = async (req, res) => {
+    try {
+        const rows = await getProduitsPhares();
+        const produits = rows.map(calculerPrixPromotion);
+        res.json(produits);
+    } catch (error) {
+        res.status(500).json({ message: "Erreur produits phares" });
+    }
+};
+
+// Nouveautés (Accueil)
+const getNew = async (req, res) => {
+    try {
+        const rows = await getProduitsNouveaux();
+        const produits = rows.map(calculerPrixPromotion);
+        res.json(produits);
+    } catch (error) {
+        res.status(500).json({ message: "Erreur nouveautés" });
+    }
+};
+
+module.exports = { 
+    getAll, 
+    getById, 
+    getByCategory, 
+    getFeatured, 
+    getNew 
+};

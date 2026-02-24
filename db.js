@@ -3,7 +3,7 @@ require('dotenv').config();
 
 const db = mysql.createPool({
     host: process.env.DB_HOST,
-    port: process.env.DB_PORT || 3306,
+    port: parseInt(process.env.DB_PORT, 10) || 3306, // On force le format nombre
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME,
@@ -12,16 +12,14 @@ const db = mysql.createPool({
     timezone: 'Z'
 });
 
-// On teste la connexion sans faire crasher le serveur
-(async () => {
-    try {
-        const connection = await db.getConnection();
+// Test de connexion simplifié : on ne bloque pas le démarrage du serveur
+db.getConnection()
+    .then(connection => {
         console.log("✅ Connexion MySQL établie avec succès !");
         connection.release();
-    } catch (err) {
-        console.error("❌ ERREUR BDD :", err.message);
-        // On ne met PAS de process.exit(1) ici en production
-    }
-})();
+    })
+    .catch(err => {
+        console.error("❌ ERREUR BDD (mais le serveur continue) :", err.message);
+    });
 
 module.exports = db;

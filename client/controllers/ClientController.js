@@ -26,11 +26,7 @@ const register = async (req, res) => {
             mdp_client: hash,
         });
 
-        res.status(201).json({
-            message: "Inscription réussie",
-            client: { nom_client, prenom_client, email_client },
-        });
-
+        res.status(201).json({ message: "Inscription réussie" });
     } catch (error) {
         console.error("Erreur Inscription :", error);
         res.status(500).json({ message: "Erreur lors de l'inscription" });
@@ -54,27 +50,13 @@ const login = async (req, res) => {
             return res.status(401).json({ message: "Identifiants incorrects" });
         }
 
-        const expire = parseInt(process.env.JWT_EXPRESS_IN, 10) || 3600;
-        // Dans la fonction login de ClientController.js
+        // Création du Token (On utilise l'id pour le middleware auth)
         const token = jwt.sign(
-            { 
-                id: client.numero_client, // C'EST CETTE LIGNE QUI MANQUAIT DANS TON TOKEN
-                email: client.email_client 
-            },
+            { id: client.numero_client, email: client.email_client },
             process.env.JWT_SECRET,
             { expiresIn: '1h' }
         );
 
-        // On garde le cookie au cas où, mais on envoie surtout le token en JSON
-        res.cookie("token", token, {
-            httpOnly: true,
-            secure: false, 
-            sameSite: "lax", 
-            maxAge: 3600 * 1000, 
-            path: "/"
-        });
-
-        // RÉPONSE JSON AVEC LE TOKEN
         res.json({ 
             message: "Connexion réussie", 
             token: token, 
@@ -88,37 +70,27 @@ const login = async (req, res) => {
 
 // --- DÉCONNEXION ---
 const logout = (req, res) => {
-    res.clearCookie("token", { 
-        httpOnly: true, 
-        secure: false, 
-        sameSite: "lax",
-        path: "/" 
-    });
     res.json({ message: "Déconnexion réussie" });
 };
 
-// --- RÉCUPÉRATION INFOS ---
-// --- RÉCUPÉRATION INFOS (ClientController.js) ---
+// --- RÉCUPÉRATION INFOS (AVEC ABONNEMENT) ---
 const getMe = async (req, res) => {
     try {
-        const clientId = req.client?.id;
-
-        if (!clientId) {
-            return res.status(401).json({ message: "ID client manquant" });
-        }
-
-        // ON UTILISE numero_client ICI (comme dans ta capture d'écran)
-        const sql = "SELECT numero_client, nom_client, prenom_client, email_client, telephone, adresse_livraison FROM client WHERE numero_client = ?";
+        // req.client.id vient du middleware verifyToken
+        const clientId = req.client.id;
+        
+        const sql = `
+            SELECT c.*, p.description as box_description, p.image as box_image
+            FROM client c
+            LEFT JOIN produits p ON c.type_abonnement = p.nom_produit
+            WHERE c.numero_client = ?`;
+        
         const [results] = await db.query(sql, [clientId]);
-
-        if (results.length === 0) {
-            return res.status(404).json({ message: "Utilisateur introuvable" });
-        }
-
-        // On renvoie le résultat
+        if (results.length === 0) return res.status(404).json({ message: "Client non trouvé" });
+        
         res.json(results[0]);
     } catch (error) {
-        console.error("Erreur SQL:", error);
+        console.error("Erreur getMe:", error);
         res.status(500).json({ message: "Erreur serveur" });
     }
 };
@@ -127,34 +99,35 @@ const getMe = async (req, res) => {
 const updateProfile = async (req, res) => {
     try {
         const { nom, prenom, telephone } = req.body;
-        const clientId = req.client.id; // Récupéré du token
+        const clientId = req.client.id; 
 
-        // On utilise les noms EXACTS de ta base : telephone et numero_client
         const sql = "UPDATE client SET nom_client = ?, prenom_client = ?, telephone = ? WHERE numero_client = ?";
-        
         await db.query(sql, [nom, prenom, telephone, clientId]);
         
         res.json({ message: "Profil mis à jour avec succès" });
     } catch (error) {
-        console.error("Erreur SQL détaillée :", error); // Regarde ton terminal VS Code pour voir l'erreur précise
-        res.status(500).json({ message: "Erreur serveur lors de la mise à jour" });
+        console.error("Erreur updateProfile:", error);
+        res.status(500).json({ message: "Erreur lors de la mise à jour" });
     }
 };
 
 // --- MISE À JOUR ADRESSE ---
 const updateAddress = async (req, res) => {
     try {
-        const { adresse_principale } = req.body; // C'est ce qu'on envoie du front
-        const clientId = req.client.id; // L'ID du badge
+        const { rue, cp, ville, type_adresse } = req.body;
+        const clientId = req.client.id;
 
-        // ON CORRIGE LES NOMS ICI :
-        const sql = "UPDATE client SET adresse_livraison = ? WHERE numero_client = ?";
-        
-        await db.query(sql, [adresse_principale, clientId]);
-        
-        res.json({ message: "Adresse mise à jour avec succès" });
+        let sql = "";
+        if (type_adresse === "facturation") {
+            sql = "UPDATE client SET adresse_facturation = ?, code_postal_facturation = ?, ville_facturation = ? WHERE numero_client = ?";
+        } else {
+            sql = "UPDATE client SET adresse_livraison = ?, code_postal_livraison = ?, ville_livraison = ? WHERE numero_client = ?";
+        }
+
+        await db.query(sql, [rue, cp, ville, clientId]);
+        res.json({ message: "Adresse mise à jour !" });
     } catch (error) {
-        console.error("Erreur SQL Adresse :", error);
+        console.error("Erreur updateAddress :", error);
         res.status(500).json({ message: "Erreur serveur" });
     }
 };
@@ -163,23 +136,116 @@ const updateAddress = async (req, res) => {
 const updatePassword = async (req, res) => {
     try {
         const { newPassword } = req.body;
-        const clientId = req.client.id; // Récupéré du token (ton chiffre 1)
+        const clientId = req.client.id; 
 
-        // 1. On crypte le mot de passe
         const hash = await hashPassword(newPassword);
-
-        // 2. ON UTILISE LES BONS NOMS : mdp_client et numero_client
         const sql = "UPDATE client SET mdp_client = ? WHERE numero_client = ?";
-        
         await db.query(sql, [hash, clientId]);
         
         res.json({ message: "Mot de passe modifié avec succès" });
     } catch (error) {
-        console.error("ERREUR SQL PASSWORD :", error); // Regarde ton terminal noir !
+        console.error("Erreur updatePassword:", error);
         res.status(500).json({ message: "Erreur serveur" });
     }
 };
 
+// --- RÉINITIALISATION MOT DE PASSE (MOT DE PASSE OUBLIÉ) ---
+const resetPassword = async (req, res) => {
+    try {
+        const { email_client, new_password } = req.body;
+        const hash = await hashPassword(new_password);
+
+        const sql = "UPDATE client SET mdp_client = ? WHERE email_client = ?";
+        const [result] = await db.query(sql, [hash, email_client]);
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: "Aucun compte trouvé avec cet email" });
+        }
+
+        res.json({ message: "Mot de passe réinitialisé !" });
+    } catch (error) {
+        console.error("Erreur resetPassword:", error);
+        res.status(500).json({ message: "Erreur serveur" });
+    }
+};
+
+// --- HISTORIQUE DES COMMANDES ---
+const getMyOrders = async (req, res) => {
+    try {
+        const clientId = req.client.id;
+        const sql = "SELECT * FROM commande WHERE numero_client = ? ORDER BY date_commande DESC";
+        const [orders] = await db.query(sql, [clientId]);
+        res.json(orders);
+    } catch (error) {
+        console.error("Erreur getMyOrders:", error);
+        res.status(500).json({ message: "Erreur serveur" });
+    }
+};
+
+// --- DÉTAILS D'UNE COMMANDE ---
+const getOrderItems = async (req, res) => {
+    try {
+        const { orderId } = req.params;
+        const sql = `
+            SELECT p.*, lc.quantite 
+            FROM produits p
+            INNER JOIN contenir lc ON p.numero_produit = lc.numero_produit
+            WHERE lc.numero_commande = ?`;
+        
+        const [items] = await db.query(sql, [orderId]);
+        res.json(items);
+    } catch (error) {
+        console.error("Erreur getOrderItems:", error);
+        res.status(500).json({ message: "Erreur lors de la récupération des articles" });
+    }
+};
+
+// --- ZONE DE DANGER : SUPPRESSION DE COMPTE (RGPD) ---
+// --- ZONE DE DANGER : SUPPRESSION DE COMPTE (RGPD) ---
+const deleteAccount = async (req, res) => {
+    try {
+        const clientId = req.client.id;
+
+        // 1. On commence par supprimer le contenu des commandes du client (table contenir)
+        const deleteItemsQuery = `
+            DELETE lc FROM contenir lc
+            INNER JOIN commande c ON lc.numero_commande = c.numero_commande
+            WHERE c.numero_client = ?`;
+        
+        await db.query(deleteItemsQuery, [clientId]);
+
+        // 2. On supprime les commandes du client
+        const deleteOrdersQuery = "DELETE FROM commande WHERE numero_client = ?";
+        await db.query(deleteOrdersQuery, [clientId]);
+
+        // 3. Enfin, on supprime le client
+        const deleteClientQuery = "DELETE FROM client WHERE numero_client = ?";
+        const [result] = await db.query(deleteClientQuery, [clientId]);
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: "Compte introuvable" });
+        }
+
+        res.status(200).json({ message: "Compte et données supprimés avec succès" });
+    } catch (error) {
+        console.error("Erreur deleteAccount détaillée:", error);
+        res.status(500).json({ 
+            message: "Erreur serveur lors de la suppression", 
+            error: error.message 
+        });
+    }
+};
+
 module.exports = { 
-    register, login, logout, getMe, updateProfile, updateAddress, updatePassword 
+    register, 
+    login,
+    logout, 
+    getMe, 
+    updateProfile, 
+    updateAddress, 
+    updatePassword, 
+    resetPassword,
+    getMyOrders,
+    getOrderItems,
+    deleteAccount // Ajout de l'export
 };

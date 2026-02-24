@@ -4,14 +4,16 @@ const {
     login, 
     logout, 
     getMe, 
-    updateProfile,      // Nouvelle fonction à ajouter au controller
-    updateAddress,      // Nouvelle fonction à ajouter au controller
-    updatePassword      // Nouvelle fonction à ajouter au controller
+    updateProfile,
+    updateAddress, 
+    updatePassword,
+    resetPassword,
+    getMyOrders,
+    getOrderItems,
+    deleteAccount // <-- Nouvelle fonction à ajouter dans ton ClientController
 } = require("../controllers/ClientController");
-const router = express.Router();
-const path = require("path"); // AGATHE
 
-// AGATHE 
+const router = express.Router();
 const { verifyToken } = require("../../mddleware/authMiddleware");
 
 /**
@@ -26,34 +28,57 @@ router.post("/login", login);
 
 /**
  * @route   GET /api/clients/me
+ * @desc    Récupérer les infos du client connecté
  */
-// AGATHE
 router.get("/me", verifyToken, getMe);
 
 /**
  * @route   POST /api/clients/logout
  */
-// AGATHE
 router.post("/logout", verifyToken, logout);
 
-// --- NOUVELLES ROUTES POUR "MON COMPTE" ---
+// --- ROUTES DE MISE À JOUR (PRIVÉES) ---
 
 /**
  * @route   PUT /api/clients/update-profile
- * @desc    Mise à jour des infos (nom, prénom, tel)
  */
 router.put("/update-profile", verifyToken, updateProfile);
 
 /**
  * @route   PUT /api/clients/update-address
- * @desc    Mise à jour de l'adresse de livraison
  */
 router.put("/update-address", verifyToken, updateAddress);
 
 /**
  * @route   PUT /api/clients/update-password
- * @desc    Changement sécurisé du mot de passe
  */
 router.put("/update-password", verifyToken, updatePassword);
+
+// --- ROUTES HISTORIQUE & COMMANDES ---
+
+/**
+ * @route   GET /api/clients/my-orders
+ */
+router.get("/my-orders", verifyToken, getMyOrders);
+
+/**
+ * @route   GET /api/clients/orders/:orderId/items
+ */
+router.get("/orders/:orderId/items", verifyToken, getOrderItems);
+
+// --- MOT DE PASSE OUBLIÉ (PUBLIQUE) ---
+
+/**
+ * @route   PUT /api/clients/reset-password
+ */
+router.put("/reset-password", resetPassword);
+
+// --- ZONE DE DANGER (RGPD) ---
+
+/**
+ * @route   DELETE /api/clients/delete-me
+ * @desc    Suppression définitive du compte client
+ */
+router.delete("/delete-me", verifyToken, deleteAccount);
 
 module.exports = router;

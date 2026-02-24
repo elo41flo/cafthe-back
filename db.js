@@ -12,6 +12,7 @@ const db = mysql.createPool({
     timezone: 'Z'
 });
 
+// On teste la connexion sans faire crasher le serveur
 (async () => {
     try {
         const connection = await db.getConnection();
@@ -19,7 +20,7 @@ const db = mysql.createPool({
         connection.release();
     } catch (err) {
         console.error("❌ ERREUR BDD :", err.message);
-        process.exit(1);
+        // On ne met PAS de process.exit(1) ici en production
     }
 })();
 

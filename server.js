@@ -11,9 +11,9 @@ const db = require('./db');
 // --- IMPORT DES ROUTES ---
 // Note : J'utilise les chemins que tu as créés sur Plesk. 
 // Assure-toi que les majuscules correspondent exactement aux noms de tes dossiers !
-const produitRoutes = require("./produit/routes/ProduitRouter");
-const clientRoutes = require("./client/routes/ClientRouter");
-const commandeRoutes = require("./commande/routes/CommandeRouter");
+//const produitRoutes = require("./produit/routes/ProduitRouter");
+//const clientRoutes = require("./client/routes/ClientRouter");
+//const commandeRoutes = require("./commande/routes/CommandeRouter");
 
 const app = express();
 
@@ -34,9 +34,9 @@ app.use(morgan("dev"));
 app.use('/images', express.static(path.join(__dirname, 'public/images')));
 
 // --- 4. ROUTES ---
-app.use("/api/produits", produitRoutes);
-app.use("/api/clients", clientRoutes); 
-app.use("/api/commandes", commandeRoutes);
+//app.use("/api/produits", produitRoutes);
+//app.use("/api/clients", clientRoutes); 
+//app.use("/api/commandes", commandeRoutes);
 
 // Route de test pour vérifier si le serveur répond
 app.get("/", (req, res) => {

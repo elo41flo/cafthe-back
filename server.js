@@ -19,7 +19,7 @@ const app = express();
 
 // --- 1. CONFIGURATION DU CORS ---
 app.use(cors({
-    origin: "https://cafthe.vercel.app", // Mets l'URL exacte de ton site Vercel ici
+    origin: "https://cafthe.vercel.app", // L'URL de ton front Vercel
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
 }));

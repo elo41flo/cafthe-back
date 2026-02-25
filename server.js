@@ -33,12 +33,13 @@ app.use("/api/clients", clientRoutes);
 app.use("/api/commandes", commandeRoutes);
 
 // Route de test pour vérifier que l'API respire
+// Commente temporairement l'import de la BDD et des routes qui l'utilisent
+// const db = require('./db'); 
+// const produitRoutes = require("./produit/routes/ProduitRouter");
+
+// Laisse juste la route health
 app.get("/health", (req, res) => {
-    res.json({ 
-        status: "OK", 
-        message: "L'API Cafthé est opérationnelle",
-        timestamp: new Date()
-    });
+    res.json({ status: "OK", message: "Test sans BDD réussi" });
 });
 
 // --- 5. GESTION DES ERREURS ---

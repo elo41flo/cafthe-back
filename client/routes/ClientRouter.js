@@ -14,7 +14,7 @@ const {
 } = require("../controllers/ClientController");
 
 const router = express.Router();
-const { verifyToken } = require("../../mddleware/authMiddleware");
+const { verifyToken } = require("../../middleware/authMiddleware");
 
 /**
  * @route   POST /api/clients/register

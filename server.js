@@ -14,14 +14,10 @@ const commandeRoutes = require("./commande/routes/CommandeRouter");
 const app = express();
 
 // --- 1. CONFIGURATION DU CORS ---
-// On accepte ton front Vercel explicitement
-app.use(
-  cors({
-    origin: process.env.FRONTEND_URL || "http://localhost:5173",
-    methods: ["GET", "POST", "PUT", "DELETE"],
-    credentials: true,
-  })
-);
+// CORS = Cross-Origin Ressource Sharing
+// OBLIGATOIRE sinon le navigateur bloque les requêtes
+// Test agressif : on autorise tout pour éliminer la piste du blocage pur
+app.use(cors());
 
 // --- 2. MIDDLEWARES ---
 app.use(cookieParser()); 
@@ -58,7 +54,6 @@ app.use((err, req, res, next) => {
 });
 
 // --- 6. LANCEMENT ---
-// TRÈS IMPORTANT : On laisse Plesk choisir le port via process.env.PORT
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {

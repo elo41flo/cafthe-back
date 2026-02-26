@@ -3,6 +3,8 @@ const cors = require('cors');
 const morgan = require('morgan');
 const path = require('path');
 const cookieParser = require('cookie-parser');
+const swaggerJsDoc = require('swagger-jsdoc');
+const swaggerUi = require('swagger-ui-express');
 require('dotenv').config();
 
 // Imports des fichiers internes
@@ -13,30 +15,54 @@ const commandeRoutes = require("./commande/routes/CommandeRouter");
 
 const app = express();
 
-// --- 1. CONFIGURATION DU CORS ---
-// On autorise tout pour le développement, mais sur Plesk tu pourras restreindre à ton domaine Vercel
+// --- 1. CONFIGURATION SWAGGER (Documentation API) ---
+const swaggerOptions = {
+    swaggerDefinition: {
+        openapi: '3.0.0',
+        info: {
+            title: "API Caf'Thé - Blois",
+            version: '1.0.0',
+            description: "Documentation interactive de l'API E-commerce Caf'Thé",
+            contact: { name: "Elo - La Fabrique du Numérique" }
+        },
+        servers: [
+            { 
+                url: process.env.NODE_ENV === 'production' 
+                    ? 'https://ton-api-deployee.com' 
+                    : `http://localhost:${process.env.PORT || 3000}`,
+                description: "Serveur principal"
+            }
+        ],
+    },
+    // Chemin vers tes fichiers de routes pour extraire la doc
+    apis: ["./produit/routes/*.js", "./client/routes/*.js", "./commande/routes/*.js"], 
+};
+
+const swaggerDocs = swaggerJsDoc(swaggerOptions);
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
+
+// --- 2. CONFIGURATION DU CORS ---
 app.use(cors({
-    origin: '*', // Tu pourras remplacer par ['https://cafthe.vercel.app'] plus tard
+    origin: '*', // À restreindre à ta Vercel plus tard pour la sécurité
     credentials: true
 }));
 
-// --- 2. MIDDLEWARES ---
+// --- 3. MIDDLEWARES ---
 app.use(cookieParser()); 
-app.use(express.json()); // Permet de lire le JSON envoyé depuis le front (React)
-app.use(morgan("dev"));  // Affiche les logs des requêtes dans ton terminal Plesk
+app.use(express.json()); 
+app.use(morgan("dev"));  
 
-// --- 3. IMAGES STATIQUES ---
-// Si tu mets tes images de produits sur le serveur backend
+// --- 4. IMAGES STATIQUES ---
 app.use('/images', express.static(path.join(__dirname, 'public/images')));
 
-// --- 4. ROUTES ---
-// --- TEST DE DIAGNOSTIC ---
+// --- 5. ROUTES ---
+// Diagnostic logs
+console.log("--- Diagnostic des Routers ---");
 console.log("1. ProduitRouter type:", typeof produitRoutes);
 console.log("2. ClientRouter type:", typeof clientRoutes);
 console.log("3. CommandeRouter type:", typeof commandeRoutes);
 
-// Ton code actuel qui crash
-app.use("/api/produits", produitRoutes); // Ligne 34
+app.use("/api/produits", produitRoutes);
 app.use("/api/clients", clientRoutes); 
 app.use("/api/commandes", commandeRoutes);
 
@@ -45,18 +71,15 @@ app.get("/health", (req, res) => {
     res.json({ 
         status: "OK", 
         message: "L'API Caf'Thé est en ligne",
-        db_status: db ? "Connectée" : "Déconnectée"
+        documentation: "/api-docs"
     });
 });
 
-// --- 5. GESTION DES ERREURS ---
-
-// Erreur 404 (Si on tape une mauvaise URL)
+// --- 6. GESTION DES ERREURS ---
 app.use((req, res) => {
     res.status(404).json({ error: "Route non trouvée", path: req.originalUrl });
 });
 
-// Erreur 500 (Le "crash" sécurisé)
 app.use((err, req, res, next) => {
     console.error("❌ ERREUR SERVEUR :", err.stack);
     res.status(500).json({ 
@@ -65,9 +88,9 @@ app.use((err, req, res, next) => {
     });
 });
 
-// --- 6. LANCEMENT ---
+// --- 7. LANCEMENT ---
 const PORT = process.env.PORT || 3000;
-
 app.listen(PORT, () => {
     console.log(`✅ Serveur Caf'Thé démarré sur le port ${PORT}`);
+    console.log(`📖 Documentation disponible sur http://localhost:${PORT}/api-docs`);
 });

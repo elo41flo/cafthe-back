@@ -7,7 +7,7 @@ const swaggerJsDoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
 require('dotenv').config();
 
-// Imports des fichiers internes
+// --- IMPORTS INTERNES ---
 const db = require('./db'); 
 const produitRoutes = require("./produit/routes/ProduitRouter");
 const clientRoutes = require("./client/routes/ClientRouter");
@@ -22,46 +22,38 @@ const swaggerOptions = {
         info: {
             title: "API Caf'Thé - Blois",
             version: '1.0.0',
-            description: "Documentation interactive de l'API E-commerce Caf'Thé",
-            contact: { name: "Elo - La Fabrique du Numérique" }
+            description: "Documentation interactive de l'API E-commerce Caf'Thé réalisée à la Fabrique du Numérique",
+            contact: { name: "Elo" }
         },
         servers: [
             { 
                 url: process.env.NODE_ENV === 'production' 
-                    ? 'https://ton-api-deployee.com' 
+                    ? process.env.VITE_API_URL // URL de prod (Render, VPS, etc.)
                     : `http://localhost:${process.env.PORT || 3000}`,
-                description: "Serveur principal"
+                description: "Serveur de développement"
             }
         ],
     },
-    // Chemin vers tes fichiers de routes pour extraire la doc
-    apis: ["./produit/routes/*.js", "./client/routes/*.js", "./commande/routes/*.js"], 
+    // Recherche les blocs @swagger dans tous tes fichiers de routes
+    apis: ["./**/routes/*.js"], 
 };
 
 const swaggerDocs = swaggerJsDoc(swaggerOptions);
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
 
-// --- 2. CONFIGURATION DU CORS ---
+// --- 2. MIDDLEWARES GLOBAUX ---
 app.use(cors({
-    origin: '*', // À restreindre à ta Vercel plus tard pour la sécurité
+    origin: '*', // En production, tu pourras restreindre à ton URL Vercel
     credentials: true
 }));
-
-// --- 3. MIDDLEWARES ---
 app.use(cookieParser()); 
-app.use(express.json()); 
-app.use(morgan("dev"));  
+app.use(express.json()); // Indispensable pour lire le corps des requêtes POST/PUT
+app.use(morgan("dev"));  // Affiche les logs de requêtes dans la console
 
-// --- 4. IMAGES STATIQUES ---
+// --- 3. FICHIERS STATIQUES (Images produits) ---
 app.use('/images', express.static(path.join(__dirname, 'public/images')));
 
-// --- 5. ROUTES ---
-// Diagnostic logs
-console.log("--- Diagnostic des Routers ---");
-console.log("1. ProduitRouter type:", typeof produitRoutes);
-console.log("2. ClientRouter type:", typeof clientRoutes);
-console.log("3. CommandeRouter type:", typeof commandeRoutes);
-
+// --- 4. ROUTES DE L'API ---
 app.use("/api/produits", produitRoutes);
 app.use("/api/clients", clientRoutes); 
 app.use("/api/commandes", commandeRoutes);
@@ -70,27 +62,32 @@ app.use("/api/commandes", commandeRoutes);
 app.get("/health", (req, res) => {
     res.json({ 
         status: "OK", 
-        message: "L'API Caf'Thé est en ligne",
+        timestamp: new Date().toISOString(),
+        message: "L'API Caf'Thé est opérationnelle",
         documentation: "/api-docs"
     });
 });
 
-// --- 6. GESTION DES ERREURS ---
+// --- 5. GESTION DES ERREURS ---
+
+// Gestion de la 404 (Route inexistante)
 app.use((req, res) => {
-    res.status(404).json({ error: "Route non trouvée", path: req.originalUrl });
+    res.status(404).json({ error: "Ressource non trouvée", path: req.originalUrl });
 });
 
+// Gestion des erreurs serveurs (500)
 app.use((err, req, res, next) => {
     console.error("❌ ERREUR SERVEUR :", err.stack);
     res.status(500).json({ 
-        message: "Une erreur interne est survenue sur le serveur Caf'Thé.",
+        message: "Une erreur interne est survenue sur le serveur.",
+        // On n'affiche le détail de l'erreur qu'en développement pour la sécurité
         error: process.env.NODE_ENV === 'development' ? err.message : {} 
     });
 });
 
-// --- 7. LANCEMENT ---
+// --- 6. LANCEMENT DU SERVEUR ---
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`✅ Serveur Caf'Thé démarré sur le port ${PORT}`);
-    console.log(`📖 Documentation disponible sur http://localhost:${PORT}/api-docs`);
+    console.log(`📖 Documentation Swagger : http://localhost:${PORT}/api-docs`);
 });

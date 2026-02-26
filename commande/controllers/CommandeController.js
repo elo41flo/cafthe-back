@@ -1,74 +1,131 @@
-const db = require("../../db");
+const ClientModel = require("../models/ClientModel");
+const jwt = require("jsonwebtoken");
 
-const registerOrder = async (req, res) => {
-    const connection = await db.getConnection();
+/**
+ * @swagger
+ * tags:
+ * name: Clients
+ * description: Gestion des comptes clients et authentification
+ */
+
+// --- AUTHENTIFICATION ---
+
+const register = async (req, res) => {
     try {
-        const { total_ttc, items, is_abonnement, type_abo, duree_abo } = req.body;
-        const clientId = req.client ? req.client.id : (req.user ? req.user.id : null);
-
-        if (!clientId) return res.status(401).json({ message: "Utilisateur non identifié" });
-
-        await connection.beginTransaction();
-
-        const sqlOrder = "INSERT INTO commande (numero_client, date_commande, total_ttc) VALUES (?, NOW(), ?)";
-        const [orderResult] = await connection.query(sqlOrder, [clientId, total_ttc]);
-        const orderId = orderResult.insertId;
-
-        if (items && items.length > 0) {
-            const sqlItems = "INSERT INTO contenir (numero_commande, numero_produit, quantite_gramme) VALUES ?";
-            const itemsValues = items.map(item => [orderId, item.id, item.quantite || 100]); 
-            await connection.query(sqlItems, [itemsValues]);
+        const { nom_client, prenom_client, email_client, mdp_client } = req.body;
+        
+        const existingClient = await ClientModel.findClientByEmail(email_client);
+        if (existingClient) {
+            return res.status(400).json({ message: "Cet email est déjà utilisé." });
         }
 
-        if (is_abonnement === true || is_abonnement === "true") {
-            const sqlUpdateClient = `
-                UPDATE client 
-                SET est_abonne = 1, type_abonnement = ?, date_debut_abo = CURDATE(), duree_abo_mois = ? 
-                WHERE numero_client = ?`;
-            await connection.query(sqlUpdateClient, [type_abo, duree_abo, clientId]);
-        }
+        const hashedPassword = await ClientModel.hashPassword(mdp_client);
+        await ClientModel.createClient({
+            nom_client, 
+            prenom_client, 
+            email_client, 
+            mdp_client: hashedPassword
+        });
 
-        await connection.commit();
-        res.status(201).json({ message: "Commande enregistrée", orderId });
-
+        res.status(201).json({ message: "Compte créé avec succès ! Vous pouvez vous connecter." });
     } catch (error) {
-        await connection.rollback();
-        res.status(500).json({ message: "Erreur enregistrement", error: error.message });
-    } finally {
-        connection.release();
+        res.status(500).json({ message: "Erreur lors de l'inscription", error: error.message });
     }
 };
 
-const getMyOrders = async (req, res) => {
+const login = async (req, res) => {
     try {
-        const clientId = req.client ? req.client.id : req.user.id;
-        const [orders] = await db.query(
-            "SELECT * FROM commande WHERE numero_client = ? ORDER BY date_commande DESC", 
-            [clientId]
+        const { email_client, mdp_client } = req.body;
+        const client = await ClientModel.findClientByEmail(email_client);
+        
+        if (!client) return res.status(401).json({ message: "Identifiants incorrects." });
+
+        const isMatch = await ClientModel.comparePassword(mdp_client, client.mdp_client);
+        if (!isMatch) return res.status(401).json({ message: "Identifiants incorrects." });
+
+        // Création du Token
+        const token = jwt.sign(
+            { id: client.numero_client }, 
+            process.env.JWT_SECRET || "votre_cle_secrete_provisoire", 
+            { expiresIn: "24h" }
         );
-        res.json(orders);
+
+        // On ne renvoie pas le mot de passe au front, même hashé
+        const { mdp_client: _, ...clientData } = client;
+
+        res.json({ 
+            token, 
+            user: clientData,
+            message: "Connexion réussie !" 
+        });
     } catch (error) {
-        res.status(500).json({ message: "Erreur historique" });
+        res.status(500).json({ message: "Erreur de connexion au serveur" });
     }
 };
 
-// AJOUT : Pour éviter le crash si ton router appelle cette fonction
-const getOrderItems = async (req, res) => {
+// --- GESTION DU PROFIL ---
+
+const getMe = async (req, res) => {
     try {
-        const { orderId } = req.params;
-        const [items] = await db.query(
-            "SELECT p.nom_produit, c.quantite_gramme FROM contenir c JOIN produits p ON c.numero_produit = p.numero_produit WHERE c.numero_commande = ?",
-            [orderId]
-        );
-        res.json(items);
+        // req.user.id est injecté par ton middleware de vérification de token
+        const client = await ClientModel.findClientById(req.user.id);
+        if (!client) return res.status(404).json({ message: "Utilisateur non trouvé" });
+
+        const { mdp_client, ...userProfile } = client;
+        res.json(userProfile);
     } catch (error) {
-        res.status(500).json({ message: "Erreur détails commande" });
+        res.status(500).json({ message: "Erreur de récupération du profil" });
     }
 };
 
-// Vérifie que ces noms correspondent EXACTEMENT à ton CommandeRouter.js
-module.exports = { 
-    registerOrder, // Si ton router utilise createOrder, change le nom ici !
-    getMyOrders,
-    getOrderItems
+const updateProfile = async (req, res) => {
+    try {
+        const { nom_client, prenom_client, email_client } = req.body;
+        await ClientModel.updateClientInfo(req.user.id, { nom_client, prenom_client, email_client });
+        res.json({ message: "Profil mis à jour avec succès !" });
+    } catch (error) {
+        res.status(500).json({ message: "Erreur lors de la mise à jour" });
+    }
 };
+
+const updatePassword = async (req, res) => {
+    try {
+        const { oldPassword, newPassword } = req.body;
+        const client = await ClientModel.findClientById(req.user.id);
+
+        const isMatch = await ClientModel.comparePassword(oldPassword, client.mdp_client);
+        if (!isMatch) return res.status(400).json({ message: "Ancien mot de passe incorrect." });
+
+        const hashedNewPassword = await ClientModel.hashPassword(newPassword);
+        await ClientModel.updatePassword(req.user.id, hashedNewPassword);
+
+        res.json({ message: "Mot de passe modifié !" });
+    } catch (error) {
+        res.status(500).json({ message: "Erreur de changement de mot de passe" });
+    }
+};
+
+
+const deleteAccount = async (req, res) => {
+    try {
+        await ClientModel.deleteClient(req.user.id);
+        res.json({ message: "Compte supprimé définitivement. Au revoir !" });
+    } catch (error) {
+        res.status(500).json({ message: "Erreur lors de la suppression du compte" });
+    }
+};
+
+// --- EXPORTS ---
+module.exports = {
+    register,
+    login,
+    getMe,
+    updateProfile,
+    updatePassword,
+    deleteAccount,
+    // Méthodes rapides (In-line)
+    logout: (req, res) => res.json({ message: "Déconnecté avec succès" }),
+    resetPassword: (req, res) => res.json({ message: "Si cet email existe, un lien a été envoyé" }),
+    getMyOrders: (req, res) => res.json({ message: "Liste de vos commandes" }),
+    getOrderItems: (req, res) => res.json({ message: "Détails de la commande" }),
+}; // On ferme l'objet avec };

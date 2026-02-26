@@ -128,4 +128,4 @@ module.exports = {
     resetPassword: (req, res) => res.json({ message: "Si cet email existe, un lien a été envoyé" }),
     getMyOrders: (req, res) => res.json({ message: "Liste de vos commandes" }),
     getOrderItems: (req, res) => res.json({ message: "Détails de la commande" }),
-};
+}; // On ferme l'objet avec };

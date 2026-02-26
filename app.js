@@ -28,14 +28,18 @@ const swaggerOptions = {
         servers: [
             { 
                 url: process.env.NODE_ENV === 'production' 
-                    ? process.env.VITE_API_URL // URL de prod (Render, VPS, etc.)
+                    ? process.env.VITE_API_URL 
                     : `http://localhost:${process.env.PORT || 3000}`,
-                description: "Serveur de développement"
+                description: "Serveur local"
             }
         ],
     },
-    // Recherche les blocs @swagger dans tous tes fichiers de routes
-    apis: ["./**/routes/*.js"], 
+    // Utilisation de path.join pour garantir que Swagger trouve les fichiers
+    apis: [
+        path.join(__dirname, "./client/routes/*.js"),
+        path.join(__dirname, "./produit/routes/*.js"),
+        path.join(__dirname, "./commande/routes/*.js")
+    ], 
 };
 
 const swaggerDocs = swaggerJsDoc(swaggerOptions);
@@ -43,14 +47,14 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
 
 // --- 2. MIDDLEWARES GLOBAUX ---
 app.use(cors({
-    origin: '*', // En production, tu pourras restreindre à ton URL Vercel
+    origin: '*', 
     credentials: true
 }));
 app.use(cookieParser()); 
-app.use(express.json()); // Indispensable pour lire le corps des requêtes POST/PUT
-app.use(morgan("dev"));  // Affiche les logs de requêtes dans la console
+app.use(express.json()); 
+app.use(morgan("dev")); 
 
-// --- 3. FICHIERS STATIQUES (Images produits) ---
+// --- 3. FICHIERS STATIQUES ---
 app.use('/images', express.static(path.join(__dirname, 'public/images')));
 
 // --- 4. ROUTES DE L'API ---
@@ -58,7 +62,7 @@ app.use("/api/produits", produitRoutes);
 app.use("/api/clients", clientRoutes); 
 app.use("/api/commandes", commandeRoutes);
 
-// Route de diagnostic (Health Check)
+// Route de diagnostic
 app.get("/health", (req, res) => {
     res.json({ 
         status: "OK", 
@@ -69,23 +73,19 @@ app.get("/health", (req, res) => {
 });
 
 // --- 5. GESTION DES ERREURS ---
-
-// Gestion de la 404 (Route inexistante)
 app.use((req, res) => {
     res.status(404).json({ error: "Ressource non trouvée", path: req.originalUrl });
 });
 
-// Gestion des erreurs serveurs (500)
 app.use((err, req, res, next) => {
     console.error("❌ ERREUR SERVEUR :", err.stack);
     res.status(500).json({ 
         message: "Une erreur interne est survenue sur le serveur.",
-        // On n'affiche le détail de l'erreur qu'en développement pour la sécurité
         error: process.env.NODE_ENV === 'development' ? err.message : {} 
     });
 });
 
-// --- 6. LANCEMENT DU SERVEUR ---
+// --- 6. LANCEMENT ---
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`✅ Serveur Caf'Thé démarré sur le port ${PORT}`);

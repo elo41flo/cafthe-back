@@ -1,2 +1,4 @@
 ❌ [26/02/2026 14:26:18] ERREUR CRITIQUE SQL : Access denied for user 'erob'@'localhost' (using password: YES) (Code: ER_ACCESS_DENIED_ERROR)
 ❌ [26/02/2026 14:33:25] ERREUR CRITIQUE SQL : Access denied for user 'erob'@'localhost' (using password: YES) (Code: ER_ACCESS_DENIED_ERROR)
+❌ [26/02/2026 14:40:29] ERREUR CRITIQUE SQL : Access denied for user 'erob'@'localhost' (using password: YES) (Code: ER_ACCESS_DENIED_ERROR)
+❌ [26/02/2026 14:41:35] ERREUR CRITIQUE SQL : Access denied for user 'erob'@'localhost' (using password: YES) (Code: ER_ACCESS_DENIED_ERROR)

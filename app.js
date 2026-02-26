@@ -14,49 +14,60 @@ const commandeRoutes = require("./commande/routes/CommandeRouter");
 const app = express();
 
 // --- 1. CONFIGURATION DU CORS ---
-// CORS = Cross-Origin Ressource Sharing
-// OBLIGATOIRE sinon le navigateur bloque les requêtes
-// Test agressif : on autorise tout pour éliminer la piste du blocage pur
-app.use(cors());
+// On autorise tout pour le développement, mais sur Plesk tu pourras restreindre à ton domaine Vercel
+app.use(cors({
+    origin: '*', // Tu pourras remplacer par ['https://cafthe.vercel.app'] plus tard
+    credentials: true
+}));
 
 // --- 2. MIDDLEWARES ---
 app.use(cookieParser()); 
-app.use(express.json()); 
-app.use(morgan("dev"));
+app.use(express.json()); // Permet de lire le JSON envoyé depuis le front (React)
+app.use(morgan("dev"));  // Affiche les logs des requêtes dans ton terminal Plesk
 
 // --- 3. IMAGES STATIQUES ---
+// Si tu mets tes images de produits sur le serveur backend
 app.use('/images', express.static(path.join(__dirname, 'public/images')));
 
 // --- 4. ROUTES ---
-app.use("/api/produits", produitRoutes);
+// --- TEST DE DIAGNOSTIC ---
+console.log("1. ProduitRouter type:", typeof produitRoutes);
+console.log("2. ClientRouter type:", typeof clientRoutes);
+console.log("3. CommandeRouter type:", typeof commandeRoutes);
+
+// Ton code actuel qui crash
+app.use("/api/produits", produitRoutes); // Ligne 34
 app.use("/api/clients", clientRoutes); 
 app.use("/api/commandes", commandeRoutes);
 
-// Route de test pour vérifier que l'API respire
-// Commente temporairement l'import de la BDD et des routes qui l'utilisent
-// const db = require('./db'); 
-// const produitRoutes = require("./produit/routes/ProduitRouter");
-
-// Laisse juste la route health
+// Route de diagnostic (Health Check)
 app.get("/health", (req, res) => {
-    res.json({ status: "OK", message: "Test sans BDD réussi" });
+    res.json({ 
+        status: "OK", 
+        message: "L'API Caf'Thé est en ligne",
+        db_status: db ? "Connectée" : "Déconnectée"
+    });
 });
 
 // --- 5. GESTION DES ERREURS ---
-// Erreur 404 (Route non trouvée)
+
+// Erreur 404 (Si on tape une mauvaise URL)
 app.use((req, res) => {
     res.status(404).json({ error: "Route non trouvée", path: req.originalUrl });
 });
 
-// Erreur 500 (Erreur serveur)
+// Erreur 500 (Le "crash" sécurisé)
 app.use((err, req, res, next) => {
     console.error("❌ ERREUR SERVEUR :", err.stack);
-    res.status(500).json({ message: "Une erreur interne est survenue." });
+    res.status(500).json({ 
+        message: "Une erreur interne est survenue sur le serveur Caf'Thé.",
+        error: process.env.NODE_ENV === 'development' ? err.message : {} 
+    });
 });
 
 // --- 6. LANCEMENT ---
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
-    console.log(`✅ Serveur démarré sur le port ${PORT}`);
+    console.log(`✅ Serveur Caf'Thé démarré sur le port ${PORT}`);
 });

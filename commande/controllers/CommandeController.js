@@ -1,70 +1,74 @@
 const db = require("../../db");
 
 const registerOrder = async (req, res) => {
+    const connection = await db.getConnection();
     try {
         const { total_ttc, items, is_abonnement, type_abo, duree_abo } = req.body;
-        const clientId = req.client.id; // Récupéré par ton middleware verifyToken
+        const clientId = req.client ? req.client.id : (req.user ? req.user.id : null);
 
-        if (!clientId) {
-            return res.status(401).json({ message: "Utilisateur non identifié" });
-        }
+        if (!clientId) return res.status(401).json({ message: "Utilisateur non identifié" });
 
-        // 1. Insérer la commande dans la table 'commande'
+        await connection.beginTransaction();
+
         const sqlOrder = "INSERT INTO commande (numero_client, date_commande, total_ttc) VALUES (?, NOW(), ?)";
-        const [orderResult] = await db.query(sqlOrder, [clientId, total_ttc]);
-        
+        const [orderResult] = await connection.query(sqlOrder, [clientId, total_ttc]);
         const orderId = orderResult.insertId;
 
-        // 2. Insérer les produits dans la table de liaison (ex: 'contenir')
         if (items && items.length > 0) {
             const sqlItems = "INSERT INTO contenir (numero_commande, numero_produit, quantite_gramme) VALUES ?";
             const itemsValues = items.map(item => [orderId, item.id, item.quantite || 100]); 
-            await db.query(sqlItems, [itemsValues]);
+            await connection.query(sqlItems, [itemsValues]);
         }
 
-        // 3. LOGIQUE ABONNEMENT : Si c'est une box, on met à jour le client
-        if (is_abonnement === true) {
+        if (is_abonnement === true || is_abonnement === "true") {
             const sqlUpdateClient = `
                 UPDATE client 
-                SET est_abonne = 1, 
-                    type_abonnement = ?, 
-                    date_debut_abo = CURDATE(), 
-                    duree_abo_mois = ? 
+                SET est_abonne = 1, type_abonnement = ?, date_debut_abo = CURDATE(), duree_abo_mois = ? 
                 WHERE numero_client = ?`;
-            
-            await db.query(sqlUpdateClient, [type_abo, duree_abo, clientId]);
-            console.log(`Abonnement activé pour le client ${clientId}`);
+            await connection.query(sqlUpdateClient, [type_abo, duree_abo, clientId]);
         }
 
-        res.status(201).json({ 
-            message: "Commande enregistrée avec succès", 
-            orderId: orderId 
-        });
+        await connection.commit();
+        res.status(201).json({ message: "Commande enregistrée", orderId });
 
     } catch (error) {
-        console.error("Erreur détaillée lors de l'enregistrement de la commande :", error);
-        res.status(500).json({ 
-            message: "Erreur interne du serveur lors de l'enregistrement", 
-            error: error.message 
-        });
+        await connection.rollback();
+        res.status(500).json({ message: "Erreur enregistrement", error: error.message });
+    } finally {
+        connection.release();
     }
 };
 
-// --- Récupérer les commandes d'un client (pour l'historique) ---
 const getMyOrders = async (req, res) => {
     try {
-        const clientId = req.client.id;
+        const clientId = req.client ? req.client.id : req.user.id;
         const [orders] = await db.query(
             "SELECT * FROM commande WHERE numero_client = ? ORDER BY date_commande DESC", 
             [clientId]
         );
         res.json(orders);
     } catch (error) {
-        res.status(500).json({ message: "Erreur lors de la récupération des commandes" });
+        res.status(500).json({ message: "Erreur historique" });
     }
 };
 
+// AJOUT : Pour éviter le crash si ton router appelle cette fonction
+const getOrderItems = async (req, res) => {
+    try {
+        const { orderId } = req.params;
+        const [items] = await db.query(
+            "SELECT p.nom_produit, c.quantite_gramme FROM contenir c JOIN produits p ON c.numero_produit = p.numero_produit WHERE c.numero_commande = ?",
+            [orderId]
+        );
+        res.json(items);
+    } catch (error) {
+        res.status(500).json({ message: "Erreur détails commande" });
+    }
+};
+
+// Vérifie que ces noms correspondent EXACTEMENT à ton CommandeRouter.js
 module.exports = { 
-    registerOrder,
-    getMyOrders
+    registerOrder, // Si ton router utilise createOrder, change le nom ici !
+    getMyOrders,
+    getOrderItems
 };

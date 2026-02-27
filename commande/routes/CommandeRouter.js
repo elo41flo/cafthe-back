@@ -9,13 +9,11 @@ router.get("/items/:orderId", async (req, res) => {
     try {
         const { orderId } = req.params;
 
-        // On utilise COALESCE pour s'assurer qu'on ne renvoie JAMAIS null pour le prix
-        // On vérifie si ta colonne s'appelle bien prix_produit, sinon ajuste ici.
         const sql = `
             SELECT 
                 p.numero_produit AS id, 
                 p.nom_produit AS nom, 
-                COALESCE(p.prix_produit, 0) AS prix, 
+                p.prix_ttc AS prix, 
                 p.image_produit AS image,
                 c.quantite_gramme AS quantite
             FROM produits p
@@ -23,21 +21,16 @@ router.get("/items/:orderId", async (req, res) => {
             WHERE c.numero_commande = ?`;
 
         const [items] = await db.query(sql, [orderId]);
-
-        if (items.length === 0) {
-            return res.status(404).json({ message: "Aucun article trouvé." });
-        }
-
-        // On s'assure que le prix est bien un nombre flottant pour le Front
-        const formattedItems = items.map(item => ({
+        
+        // On force le prix à être un nombre pour éviter le "null"
+        const cleanItems = items.map(item => ({
             ...item,
-            prix: parseFloat(item.prix)
+            prix: parseFloat(item.prix) || 0
         }));
 
-        res.json(formattedItems);
+        res.json(cleanItems);
     } catch (error) {
-        console.error("Erreur SQL items commande:", error);
-        res.status(500).json({ error: "Erreur serveur lors de la récupération des articles" });
+        res.status(500).json({ error: error.message });
     }
 });
 
